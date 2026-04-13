@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 import secrets
@@ -173,7 +174,74 @@ class SearchRequest(BaseModel):
     agent_id: Optional[str] = None
     filters: Optional[Dict[str, Any]] = None
     top_k: Optional[int] = Field(None, description="Maximum number of results to return.")
+    limit: Optional[int] = Field(None, description="Alias for top_k for Mem0 SDKs that use limit.")
     threshold: Optional[float] = Field(None, description="Minimum similarity score for results.")
+
+
+def _prepare_search_kwargs(search_req: SearchRequest) -> tuple[Dict[str, Any], bool]:
+    supported_params = inspect.signature(MEMORY_INSTANCE.search).parameters
+    search_kwargs: Dict[str, Any] = {}
+
+    for field_name in ("user_id", "run_id", "agent_id", "filters"):
+        value = getattr(search_req, field_name)
+        if value is not None and field_name in supported_params:
+            search_kwargs[field_name] = value
+
+    requested_limit = search_req.limit if search_req.limit is not None else search_req.top_k
+    if requested_limit is not None:
+        if "top_k" in supported_params:
+            search_kwargs["top_k"] = requested_limit
+        elif "limit" in supported_params:
+            search_kwargs["limit"] = requested_limit
+        else:
+            logging.warning(
+                "Search request asked for a result limit, but this Mem0 SDK version supports neither top_k nor limit."
+            )
+
+    threshold_is_native = False
+    if search_req.threshold is not None:
+        if "threshold" in supported_params:
+            search_kwargs["threshold"] = search_req.threshold
+            threshold_is_native = True
+        else:
+            logging.info("Mem0 SDK search() does not expose threshold; applying threshold filtering in the API layer.")
+
+    return search_kwargs, threshold_is_native
+
+
+def _apply_score_threshold(results: Any, threshold: Optional[float]) -> Any:
+    if threshold is None or not isinstance(results, list):
+        return results
+
+    filtered_results = []
+    skipped_items = 0
+
+    for item in results:
+        if not isinstance(item, dict):
+            filtered_results.append(item)
+            skipped_items += 1
+            continue
+
+        score = item.get("score")
+        if score is None:
+            filtered_results.append(item)
+            skipped_items += 1
+            continue
+
+        try:
+            if float(score) >= threshold:
+                filtered_results.append(item)
+        except (TypeError, ValueError):
+            filtered_results.append(item)
+            skipped_items += 1
+
+    if skipped_items:
+        logging.warning(
+            "Threshold filtering skipped %s search result(s) because they did not expose a numeric score.",
+            skipped_items,
+        )
+
+    return filtered_results
 
 
 @app.get("/", summary="Redirect to the OpenAPI documentation", include_in_schema=False)
@@ -301,8 +369,11 @@ def delete_all_memories(
 @app.post("/search", summary="Search memories")
 def search_memories(search_req: SearchRequest, _api_key: Optional[str] = Depends(verify_api_key)) -> JSONResponse:
     try:
-        params = {k: v for k, v in search_req.model_dump().items() if v is not None and k != "query"}
-        return _json_response(MEMORY_INSTANCE.search(query=search_req.query, **params))
+        search_kwargs, threshold_is_native = _prepare_search_kwargs(search_req)
+        results = MEMORY_INSTANCE.search(query=search_req.query, **search_kwargs)
+        if search_req.threshold is not None and not threshold_is_native:
+            results = _apply_score_threshold(results, search_req.threshold)
+        return _json_response(results)
     except Exception as exc:
         logging.exception("Error in search_memories")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
