@@ -1,0 +1,5 @@
+.env
+.env.coolify
+.venv/
+__pycache__/
+app/__pycache__/

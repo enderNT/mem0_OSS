@@ -1,0 +1,4 @@
+services:
+  gateway:
+    ports:
+      - "${GATEWAY_PORT:-3000}:80"
