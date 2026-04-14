@@ -38,7 +38,7 @@ services:
       start_period: 10s
 
   mem0-store:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:${QDRANT_IMAGE_TAG:-v1.13.6}
     restart: unless-stopped
     expose:
       - "6333"
@@ -61,6 +61,7 @@ services:
       QDRANT_HOST: ${QDRANT_HOST:-mem0-store}
       QDRANT_PORT: ${QDRANT_PORT:-6333}
       QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-mem0}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       HISTORY_DB_PATH: ${HISTORY_DB_PATH:-/app/history/history.db}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_MODEL: ${LLM_MODEL:-gpt-4.1-nano-2025-04-14}

@@ -1,11 +1,15 @@
 .env
 .env.*
 !.env.coolify.example
+.DS_Store
 .git
 .gitignore
 .venv
 __pycache__
 app/__pycache__
+.pytest_cache
+dist
+build
 *.pyc
 *.pyo
 *.pyd

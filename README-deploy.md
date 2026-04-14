@@ -15,7 +15,7 @@ This bundle now runs Mem0 OSS directly with:
 
 The public URL serves the Mem0 OSS API:
 
-- `/` redirects to `/docs`
+- `/` shows the web console for managing memories
 - `/docs` shows Swagger / OpenAPI UI
 - `/openapi.json` exposes the schema
 - `/memories`, `/search`, `/reset`, etc. are proxied to Mem0 OSS
@@ -48,6 +48,12 @@ At minimum set these in Coolify:
 
 Recommended defaults are already included in `.env.coolify.example`.
 
+Important for public Git repos:
+
+- Commit `.env.coolify.example`, not real `.env` or `.env.coolify` files.
+- Put all real secrets in Coolify's environment UI or secret store.
+- The repository is expected to contain `docker-compose.yml`, `Dockerfile`, `requirements.txt`, and the `app/` directory so Coolify can build `mem0-api` from source.
+
 ## Coolify deployment
 
 Use this as a `Docker Compose` resource from a Git repository.
@@ -73,7 +79,7 @@ Important:
 
 Check these endpoints from the generated Coolify URL:
 
-- `/` should redirect to `/docs`
+- `/` should render the web console
 - `/docs` should show FastAPI Swagger
 - `/openapi.json` should return the OpenAPI document
 - `/healthz` should return `{"status":"ok"}`
@@ -132,5 +138,6 @@ Then open:
 
 - Mem0 OSS docs state that the self-hosted REST server does not use the `/v1/` prefix. Use `/memories`, `/search`, etc. directly.
 - `ADMIN_API_KEY` is optional in development but should be set in production; when present, requests must send `X-API-Key`.
+- Qdrant is pinned through `QDRANT_IMAGE_TAG` in the example environment so GitHub-based deployments are more reproducible than using `latest`.
 - This bundle assumes a fresh Mem0 OSS deployment. It does not promise wire compatibility with existing OpenMemory UI/MCP state.
 - If you ever want the "paste compose only" deployment mode, the next step would be publishing `mem0-api` to a container registry and changing the stack to use `image:` instead of `build:`.

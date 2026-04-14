@@ -2,6 +2,8 @@
 
 Plug-and-play Mem0 OSS deployment for Coolify using Docker Compose from a Git repository.
 
+This repository is structured to be pushed directly to GitHub and deployed from Coolify as a `Docker Compose` resource that builds the API image from the repo contents.
+
 ## What this deploys
 
 - `gateway`: the only public service
@@ -9,6 +11,21 @@ Plug-and-play Mem0 OSS deployment for Coolify using Docker Compose from a Git re
 - `mem0-store`: Qdrant for vector storage
 
 This is a Mem0 OSS API deployment, not OpenMemory.
+
+## Web console
+
+The FastAPI service now serves a lightweight management UI at `/`.
+
+- `/` provides a browser-based console for create, read, update, delete, search, history, configure, and reset actions.
+- `/docs` keeps the OpenAPI / Swagger interface available for direct API inspection.
+
+## GitHub to Coolify flow
+
+1. Push this repository to GitHub.
+2. In Coolify, create a new resource from that GitHub repository.
+3. Select `Docker Compose` and point Coolify to `/docker-compose.yml`.
+4. Add the variables from `.env.coolify.example` in the Coolify environment UI.
+5. Expose only the `gateway` service with a domain on port `80`.
 
 ## Coolify
 

@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mem0 Console</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">mem0 oss console</p>
+          <h1>Administra memorias sin depender de Swagger</h1>
+          <p class="hero-copy">
+            Esta interfaz usa los endpoints reales de esta instancia de Mem0 OSS para crear,
+            listar, buscar, editar, revisar historial y eliminar memorias.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button id="health-button" class="secondary">Verificar salud</button>
+          <a class="ghost-link" href="/docs" target="_blank" rel="noreferrer">Abrir OpenAPI</a>
+        </div>
+      </header>
+
+      <section class="top-grid">
+        <article class="panel accent-panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">autenticacion</p>
+              <h2>Sesion API</h2>
+            </div>
+            <span id="health-pill" class="pill">Sin verificar</span>
+          </div>
+          <label>
+            <span>X-API-Key</span>
+            <input id="api-key" type="password" placeholder="Se envia en cada request si la defines">
+          </label>
+          <div class="inline-actions">
+            <button id="save-key-button">Guardar localmente</button>
+            <button id="clear-key-button" class="secondary">Limpiar</button>
+          </div>
+          <p class="muted">Si ADMIN_API_KEY esta activa en el backend, esta clave se enviara como header.</p>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">contexto</p>
+              <h2>Identificadores de trabajo</h2>
+            </div>
+          </div>
+          <div class="triple-grid">
+            <label>
+              <span>user_id</span>
+              <input id="scope-user-id" type="text" placeholder="cliente-123">
+            </label>
+            <label>
+              <span>agent_id</span>
+              <input id="scope-agent-id" type="text" placeholder="sales-agent">
+            </label>
+            <label>
+              <span>run_id</span>
+              <input id="scope-run-id" type="text" placeholder="run-2026-04-14">
+            </label>
+          </div>
+          <div class="inline-actions">
+            <button id="load-memories-button">Cargar memorias</button>
+            <button id="delete-all-button" class="danger">Eliminar por alcance</button>
+          </div>
+          <p class="muted">Mem0 requiere al menos uno de estos identificadores para listar o borrar en lote.</p>
+        </article>
+      </section>
+
+      <main class="content-grid">
+        <section class="panel span-two">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">crud</p>
+              <h2>Memorias</h2>
+            </div>
+            <span id="memory-count" class="panel-meta">0 resultados</span>
+          </div>
+          <div id="memory-empty" class="empty-state">
+            Carga memorias por user_id, agent_id o run_id para administrarlas desde aqui.
+          </div>
+          <div id="memory-list" class="memory-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">alta</p>
+              <h2>Crear memoria</h2>
+            </div>
+          </div>
+          <div id="messages-builder" class="stack"></div>
+          <button id="add-message-button" class="secondary stretch">Agregar mensaje</button>
+          <div class="triple-grid compact-grid">
+            <label>
+              <span>user_id</span>
+              <input id="create-user-id" type="text" placeholder="Opcional">
+            </label>
+            <label>
+              <span>agent_id</span>
+              <input id="create-agent-id" type="text" placeholder="Opcional">
+            </label>
+            <label>
+              <span>run_id</span>
+              <input id="create-run-id" type="text" placeholder="Opcional">
+            </label>
+          </div>
+          <div class="double-grid compact-grid">
+            <label>
+              <span>memory_type</span>
+              <input id="create-memory-type" type="text" placeholder="Opcional">
+            </label>
+            <label>
+              <span>infer</span>
+              <select id="create-infer">
+                <option value="">Usar default SDK</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            <span>prompt personalizado</span>
+            <textarea id="create-prompt" rows="3" placeholder="Opcional"></textarea>
+          </label>
+          <label>
+            <span>metadata JSON</span>
+            <textarea id="create-metadata" rows="5" placeholder='{"source":"ui"}'></textarea>
+          </label>
+          <button id="create-memory-button" class="stretch">Crear memoria</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">busqueda</p>
+              <h2>Buscar</h2>
+            </div>
+          </div>
+          <label>
+            <span>query</span>
+            <textarea id="search-query" rows="4" placeholder="What do you know about this user?"></textarea>
+          </label>
+          <div class="triple-grid compact-grid">
+            <label>
+              <span>user_id</span>
+              <input id="search-user-id" type="text" placeholder="Opcional">
+            </label>
+            <label>
+              <span>agent_id</span>
+              <input id="search-agent-id" type="text" placeholder="Opcional">
+            </label>
+            <label>
+              <span>run_id</span>
+              <input id="search-run-id" type="text" placeholder="Opcional">
+            </label>
+          </div>
+          <div class="double-grid compact-grid">
+            <label>
+              <span>top_k / limit</span>
+              <input id="search-limit" type="number" min="1" step="1" placeholder="5">
+            </label>
+            <label>
+              <span>threshold</span>
+              <input id="search-threshold" type="number" min="0" max="1" step="0.01" placeholder="0.5">
+            </label>
+          </div>
+          <label>
+            <span>filters JSON</span>
+            <textarea id="search-filters" rows="4" placeholder='{"metadata":{"source":"crm"}}'></textarea>
+          </label>
+          <button id="search-button" class="stretch">Buscar memorias</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">detalle</p>
+              <h2>Editar memoria</h2>
+            </div>
+          </div>
+          <label>
+            <span>memory_id</span>
+            <input id="selected-memory-id" type="text" placeholder="Selecciona una memoria o escribe un ID">
+          </label>
+          <div class="inline-actions">
+            <button id="fetch-memory-button" class="secondary">Cargar detalle</button>
+            <button id="history-button" class="secondary">Ver historial</button>
+          </div>
+          <label>
+            <span>texto</span>
+            <textarea id="selected-memory-text" rows="6" placeholder="Contenido editable"></textarea>
+          </label>
+          <label>
+            <span>metadata JSON</span>
+            <textarea id="selected-memory-metadata" rows="5" placeholder='{"edited_by":"ui"}'></textarea>
+          </label>
+          <div class="inline-actions">
+            <button id="update-memory-button">Actualizar</button>
+            <button id="delete-memory-button" class="danger">Eliminar</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">admin</p>
+              <h2>Configuracion Mem0</h2>
+            </div>
+          </div>
+          <label>
+            <span>config JSON</span>
+            <textarea id="config-json" rows="12" placeholder='{"version":"v1.1"}'></textarea>
+          </label>
+          <button id="configure-button" class="stretch secondary">Aplicar configuracion</button>
+          <div class="danger-zone">
+            <div>
+              <p class="panel-kicker">riesgo alto</p>
+              <h3>Reset global</h3>
+              <p class="muted">Ejecuta el endpoint /reset y vacia todas las memorias del store.</p>
+            </div>
+            <button id="reset-button" class="danger">Reset total</button>
+          </div>
+        </section>
+
+        <section class="panel span-two output-panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">respuesta</p>
+              <h2>Salida cruda</h2>
+            </div>
+            <span id="result-label" class="panel-meta">Sin actividad</span>
+          </div>
+          <pre id="result-viewer">Esperando acciones...</pre>
+        </section>
+      </main>
+    </div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

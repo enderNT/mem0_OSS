@@ -1,5 +1,10 @@
 .env
 .env.coolify
+.env.local
+.DS_Store
 .venv/
 __pycache__/
 app/__pycache__/
+.pytest_cache/
+dist/
+build/

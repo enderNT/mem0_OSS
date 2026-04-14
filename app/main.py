@@ -3,13 +3,15 @@ import logging
 import os
 import secrets
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from mem0 import Memory
 from pydantic import BaseModel, Field
 
@@ -111,6 +113,8 @@ elif len(ADMIN_API_KEY) < MIN_KEY_LENGTH:
     )
 
 MEMORY_INSTANCE = _initialize_memory_instance()
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(
     title="Mem0 OSS REST API",
@@ -121,6 +125,7 @@ app = FastAPI(
     ),
     version="1.0.0",
 )
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -244,9 +249,9 @@ def _apply_score_threshold(results: Any, threshold: Optional[float]) -> Any:
     return filtered_results
 
 
-@app.get("/", summary="Redirect to the OpenAPI documentation", include_in_schema=False)
-def home() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
+@app.get("/", include_in_schema=False)
+def home() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/healthz", include_in_schema=False)
