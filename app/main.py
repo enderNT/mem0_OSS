@@ -365,6 +365,33 @@ def _determine_global_list_limit() -> tuple[int, bool]:
     return fallback_limit, True
 
 
+def _call_vector_store_list(vector_store: Any, *, filters: Optional[Dict[str, Any]], limit: int) -> Any:
+    attempts = [
+        ((), {"filters": filters, "top_k": limit}),
+        ((), {"filters": filters, "limit": limit}),
+        ((), {"filters": filters, "topK": limit}),
+        ((filters, limit), {}),
+        ((filters,), {"top_k": limit}),
+        ((filters,), {"limit": limit}),
+        ((filters,), {"topK": limit}),
+        ((filters,), {}),
+        ((), {}),
+    ]
+    last_type_error: Optional[TypeError] = None
+
+    for args, kwargs in attempts:
+        try:
+            return vector_store.list(*args, **kwargs)
+        except TypeError as exc:
+            last_type_error = exc
+            continue
+
+    raise RuntimeError(
+        "Could not call vector_store.list() with any supported signature. "
+        f"Last error: {last_type_error}"
+    )
+
+
 def _list_all_memories() -> Dict[str, Any]:
     vector_store = getattr(MEMORY_INSTANCE, "vector_store", None)
     if vector_store is None:
@@ -372,7 +399,7 @@ def _list_all_memories() -> Dict[str, Any]:
 
     limit, used_fallback_limit = _determine_global_list_limit()
 
-    raw_results = vector_store.list(filters=None, top_k=limit)
+    raw_results = _call_vector_store_list(vector_store, filters=None, limit=limit)
     formatted_results = _format_vector_store_results(raw_results)
 
     response: Dict[str, Any] = {

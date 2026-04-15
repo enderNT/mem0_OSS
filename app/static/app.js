@@ -8,6 +8,7 @@ const elements = {
   clearKeyButton: document.getElementById("clear-key-button"),
   healthButton: document.getElementById("health-button"),
   healthPill: document.getElementById("health-pill"),
+  toastRegion: document.getElementById("toast-region"),
   resultViewer: document.getElementById("result-viewer"),
   resultLabel: document.getElementById("result-label"),
   memoryList: document.getElementById("memory-list"),
@@ -76,7 +77,41 @@ function initialize() {
   elements.configureButton.addEventListener("click", configureMemory);
   elements.resetButton.addEventListener("click", resetMemoryStore);
 
-  checkHealth();
+  checkHealth({ silent: true });
+}
+
+function showToast(title, message, type = "info", duration = 3200) {
+  if (!elements.toastRegion) {
+    return;
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `toast is-${type}`;
+  toast.innerHTML = `
+    <p class="toast-title">${escapeHtml(title)}</p>
+    <p class="toast-body">${escapeHtml(message)}</p>
+  `;
+
+  elements.toastRegion.appendChild(toast);
+  window.setTimeout(() => {
+    toast.remove();
+  }, duration);
+}
+
+function getPayloadMessage(payload, fallbackMessage) {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload.trim();
+  }
+  if (payload?.message) {
+    return String(payload.message);
+  }
+  if (payload?.detail) {
+    return typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail, null, 2);
+  }
+  if (payload?.warning) {
+    return String(payload.warning);
+  }
+  return fallbackMessage;
 }
 
 function getApiKey() {
@@ -88,17 +123,20 @@ function saveApiKey() {
   if (!value) {
     window.localStorage.removeItem(storageKeys.apiKey);
     setResult("Sesion API", { message: "No habia clave para guardar" });
+    showToast("Sesion API", "No habia clave para guardar", "info");
     return;
   }
 
   window.localStorage.setItem(storageKeys.apiKey, value);
   setResult("Sesion API", { message: "Clave guardada en localStorage" });
+  showToast("Sesion API", "Clave guardada localmente", "success");
 }
 
 function clearApiKey() {
   elements.apiKey.value = "";
   window.localStorage.removeItem(storageKeys.apiKey);
   setResult("Sesion API", { message: "Clave eliminada" });
+  showToast("Sesion API", "Clave eliminada", "info");
 }
 
 async function apiRequest(path, options = {}) {
@@ -150,14 +188,21 @@ function setHealth(ok, label) {
   elements.healthPill.classList.toggle("is-error", !ok);
 }
 
-async function checkHealth() {
+async function checkHealth(options = {}) {
+  const { silent = false } = options;
   try {
     const payload = await apiRequest("/healthz");
     setHealth(true, payload?.status === "ok" ? "API saludable" : "Respuesta recibida");
     setResult("Healthz", payload);
+    if (!silent) {
+      showToast("Healthz", getPayloadMessage(payload, "API saludable"), "success");
+    }
   } catch (error) {
     setHealth(false, "Error de conexion");
     setResult("Healthz", { error: error.message });
+    if (!silent) {
+      showToast("Healthz", error.message, "error", 4200);
+    }
   }
 }
 
@@ -253,10 +298,12 @@ async function createMemory() {
       body: JSON.stringify(payload),
     });
     setResult("Crear memoria", response);
+    showToast("Crear memoria", getPayloadMessage(response, "Memoria creada"), "success");
     syncCreateScopeIntoGlobal(payload);
-    await loadMemories();
+    await loadMemories({ silent: true });
   } catch (error) {
     setResult("Crear memoria", { error: error.message });
+    showToast("Crear memoria", error.message, "error", 4200);
   }
 }
 
@@ -283,7 +330,8 @@ function queryStringFromObject(input) {
   return output ? `?${output}` : "";
 }
 
-async function loadMemories() {
+async function loadMemories(options = {}) {
+  const { silent = false } = options;
   const scope = Object.fromEntries(Object.entries(buildGlobalScope()).filter(([, value]) => Boolean(value)));
   const resultLabel = Object.keys(scope).length ? "Cargar memorias" : "Cargar todas las memorias";
 
@@ -292,9 +340,22 @@ async function loadMemories() {
     state.memories = normalizeMemoryArray(payload);
     renderMemoryList(state.memories);
     setResult(resultLabel, payload);
+    if (!silent) {
+      const count = state.memories.length;
+      const summary = Object.keys(scope).length
+        ? `Se cargaron ${count} memoria${count === 1 ? "" : "s"} para el alcance actual.`
+        : `Se cargaron ${count} memoria${count === 1 ? "" : "s"} del store completo.`;
+      showToast(resultLabel, summary, "success");
+      if (payload?.warning) {
+        showToast(resultLabel, payload.warning, "warning", 4600);
+      }
+    }
   } catch (error) {
     renderMemoryList([]);
     setResult(resultLabel, { error: error.message });
+    if (!silent) {
+      showToast(resultLabel, error.message, "error", 4200);
+    }
   }
 }
 
@@ -402,6 +463,7 @@ async function fetchMemoryById() {
   const memoryId = elements.selectedMemoryId.value.trim();
   if (!memoryId) {
     setResult("Detalle memoria", { error: "Especifica memory_id" });
+    showToast("Detalle memoria", "Especifica memory_id", "warning");
     return;
   }
 
@@ -411,8 +473,10 @@ async function fetchMemoryById() {
       hydrateEditor(payload);
     }
     setResult("Detalle memoria", payload);
+    showToast("Detalle memoria", `Memoria ${memoryId} cargada.`, "info");
   } catch (error) {
     setResult("Detalle memoria", { error: error.message });
+    showToast("Detalle memoria", error.message, "error", 4200);
   }
 }
 
@@ -420,14 +484,22 @@ async function fetchMemoryHistory() {
   const memoryId = elements.selectedMemoryId.value.trim();
   if (!memoryId) {
     setResult("Historial memoria", { error: "Especifica memory_id" });
+    showToast("Historial memoria", "Especifica memory_id", "warning");
     return;
   }
 
   try {
     const payload = await apiRequest(`/memories/${encodeURIComponent(memoryId)}/history`);
     setResult("Historial memoria", payload);
+    const historyCount = Array.isArray(payload) ? payload.length : Array.isArray(payload?.results) ? payload.results.length : null;
+    showToast(
+      "Historial memoria",
+      historyCount === null ? `Historial de ${memoryId} cargado.` : `${historyCount} cambio${historyCount === 1 ? "" : "s"} cargado${historyCount === 1 ? "" : "s"}.`,
+      "info"
+    );
   } catch (error) {
     setResult("Historial memoria", { error: error.message });
+    showToast("Historial memoria", error.message, "error", 4200);
   }
 }
 
@@ -435,6 +507,7 @@ async function updateMemory() {
   const memoryId = elements.selectedMemoryId.value.trim();
   if (!memoryId) {
     setResult("Actualizar memoria", { error: "Especifica memory_id" });
+    showToast("Actualizar memoria", "Especifica memory_id", "warning");
     return;
   }
 
@@ -448,9 +521,11 @@ async function updateMemory() {
       body: JSON.stringify(payload),
     });
     setResult("Actualizar memoria", response);
-    await loadMemories();
+    showToast("Actualizar memoria", getPayloadMessage(response, "Memoria actualizada"), "success");
+    await loadMemories({ silent: true });
   } catch (error) {
     setResult("Actualizar memoria", { error: error.message });
+    showToast("Actualizar memoria", error.message, "error", 4200);
   }
 }
 
@@ -458,6 +533,7 @@ async function deleteSelectedMemory() {
   const memoryId = elements.selectedMemoryId.value.trim();
   if (!memoryId) {
     setResult("Eliminar memoria", { error: "Especifica memory_id" });
+    showToast("Eliminar memoria", "Especifica memory_id", "warning");
     return;
   }
 
@@ -470,11 +546,13 @@ async function deleteSelectedMemory() {
       method: "DELETE",
     });
     setResult("Eliminar memoria", payload);
+    showToast("Eliminar memoria", getPayloadMessage(payload, `Memoria ${memoryId} eliminada.`), "success");
     elements.selectedMemoryText.value = "";
     elements.selectedMemoryMetadata.value = "";
-    await loadMemories();
+    await loadMemories({ silent: true });
   } catch (error) {
     setResult("Eliminar memoria", { error: error.message });
+    showToast("Eliminar memoria", error.message, "error", 4200);
   }
 }
 
@@ -482,6 +560,7 @@ async function deleteAllByScope() {
   const scope = Object.fromEntries(Object.entries(buildGlobalScope()).filter(([, value]) => Boolean(value)));
   if (!Object.keys(scope).length) {
     setResult("Eliminar por alcance", { error: "Define user_id, agent_id o run_id" });
+    showToast("Eliminar por alcance", "Define user_id, agent_id o run_id", "warning");
     return;
   }
 
@@ -496,8 +575,10 @@ async function deleteAllByScope() {
     state.memories = [];
     renderMemoryList([]);
     setResult("Eliminar por alcance", payload);
+    showToast("Eliminar por alcance", getPayloadMessage(payload, "Memorias eliminadas"), "success");
   } catch (error) {
     setResult("Eliminar por alcance", { error: error.message });
+    showToast("Eliminar por alcance", error.message, "error", 4200);
   }
 }
 
@@ -524,8 +605,14 @@ async function searchMemories() {
       renderMemoryList(results);
     }
     setResult("Buscar memorias", response);
+    showToast(
+      "Buscar memorias",
+      `Busqueda completada con ${results.length} resultado${results.length === 1 ? "" : "s"}.`,
+      "success"
+    );
   } catch (error) {
     setResult("Buscar memorias", { error: error.message });
+    showToast("Buscar memorias", error.message, "error", 4200);
   }
 }
 
@@ -541,8 +628,10 @@ async function configureMemory() {
       body: JSON.stringify(payload),
     });
     setResult("Configurar Mem0", response);
+    showToast("Configurar Mem0", getPayloadMessage(response, "Configuracion aplicada"), "success");
   } catch (error) {
     setResult("Configurar Mem0", { error: error.message });
+    showToast("Configurar Mem0", error.message, "error", 4200);
   }
 }
 
@@ -556,8 +645,10 @@ async function resetMemoryStore() {
     state.memories = [];
     renderMemoryList([]);
     setResult("Reset total", payload);
+    showToast("Reset total", getPayloadMessage(payload, "Store reiniciado"), "success", 4200);
   } catch (error) {
     setResult("Reset total", { error: error.message });
+    showToast("Reset total", error.message, "error", 4200);
   }
 }
 

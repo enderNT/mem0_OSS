@@ -392,6 +392,63 @@ button.stretch {
   background: rgba(207, 63, 43, 0.08);
 }
 
+.toast-region {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 28px));
+  pointer-events: none;
+}
+
+.toast {
+  padding: 14px 16px;
+  border: 1px solid rgba(34, 25, 16, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 250, 244, 0.96);
+  color: var(--ink);
+  box-shadow: 0 16px 32px rgba(57, 39, 20, 0.16);
+  backdrop-filter: blur(12px);
+  animation: toast-in 180ms ease-out;
+}
+
+.toast.is-success {
+  border-color: rgba(13, 91, 31, 0.2);
+  background: rgba(242, 253, 244, 0.96);
+}
+
+.toast.is-error {
+  border-color: rgba(180, 35, 24, 0.2);
+  background: rgba(255, 244, 242, 0.97);
+}
+
+.toast.is-warning {
+  border-color: rgba(197, 112, 24, 0.2);
+  background: rgba(255, 248, 238, 0.97);
+}
+
+.toast.is-info {
+  border-color: rgba(15, 118, 110, 0.18);
+  background: rgba(241, 251, 250, 0.97);
+}
+
+.toast-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.toast-body {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .span-two {
   grid-column: span 2;
 }
@@ -400,6 +457,18 @@ button.stretch {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
 
   to {
@@ -447,5 +516,11 @@ button.stretch {
 
   .hero h1 {
     max-width: none;
+  }
+
+  .toast-region {
+    right: 10px;
+    bottom: 10px;
+    width: min(100vw - 20px, 100%);
   }
 }
