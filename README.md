@@ -27,6 +27,8 @@ The FastAPI service now serves a lightweight management UI at `/`.
 4. Add the variables from `.env.coolify.example` in the Coolify environment UI.
 5. Expose only the `gateway` service with a domain on port `80`.
 
+If Coolify reports a failure while `mem0-store` is pulling, set `QDRANT_IMAGE` explicitly in the resource environment. The default is now `qdrant/qdrant:v1.17.1`.
+
 ## Coolify
 
 Use this repo as a `Docker Compose` resource from Git.

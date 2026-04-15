@@ -53,6 +53,7 @@ Important for public Git repos:
 - Commit `.env.coolify.example`, not real `.env` or `.env.coolify` files.
 - Put all real secrets in Coolify's environment UI or secret store.
 - The repository is expected to contain `docker-compose.yml`, `Dockerfile`, `requirements.txt`, and the `app/` directory so Coolify can build `mem0-api` from source.
+- `QDRANT_IMAGE` can override the full vector-store image reference from Coolify if Docker Hub pull behavior changes or you need a registry mirror.
 
 ## Coolify deployment
 
@@ -138,6 +139,16 @@ Then open:
 
 - Mem0 OSS docs state that the self-hosted REST server does not use the `/v1/` prefix. Use `/memories`, `/search`, etc. directly.
 - `ADMIN_API_KEY` is optional in development but should be set in production; when present, requests must send `X-API-Key`.
-- Qdrant is pinned through `QDRANT_IMAGE_TAG` in the example environment so GitHub-based deployments are more reproducible than using `latest`.
+- Qdrant is pinned through `QDRANT_IMAGE` in the example environment so GitHub-based deployments are more reproducible than using `latest`, while still letting you swap the full image reference from Coolify.
 - This bundle assumes a fresh Mem0 OSS deployment. It does not promise wire compatibility with existing OpenMemory UI/MCP state.
 - If you ever want the "paste compose only" deployment mode, the next step would be publishing `mem0-api` to a container registry and changing the stack to use `image:` instead of `build:`.
+
+## Troubleshooting image pulls
+
+If Coolify fails during `mem0-store Pulling`:
+
+1. Confirm the server running Coolify can reach Docker Hub.
+2. Retry once, because transient Docker Hub errors are common.
+3. In Coolify, set `QDRANT_IMAGE=qdrant/qdrant:v1.17.1` explicitly if an older cached environment value is still present.
+4. If your server uses a registry mirror or private proxy, set `QDRANT_IMAGE` to that fully qualified image reference instead.
+5. If it still fails, the issue is likely host-level registry access, rate limiting, or outbound networking rather than the compose syntax.

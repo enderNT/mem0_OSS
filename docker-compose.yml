@@ -38,7 +38,7 @@ services:
       start_period: 10s
 
   mem0-store:
-    image: qdrant/qdrant:${QDRANT_IMAGE_TAG:-v1.13.6}
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:v1.17.1}
     restart: unless-stopped
     expose:
       - "6333"
