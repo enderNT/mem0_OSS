@@ -40,6 +40,8 @@ def _build_default_config() -> Dict[str, Any]:
     openai_api_key = os.environ.get("OPENAI_API_KEY", "")
     llm_api_key = os.environ.get("LLM_API_KEY") or openai_api_key
     embedder_api_key = os.environ.get("EMBEDDER_API_KEY") or openai_api_key
+    qdrant_url = os.environ.get("QDRANT_URL")
+    qdrant_api_key = os.environ.get("QDRANT_API_KEY")
 
     if llm_provider == "openai" and not llm_api_key:
         raise RuntimeError("OPENAI_API_KEY or LLM_API_KEY is required for the default Mem0 LLM config.")
@@ -49,13 +51,21 @@ def _build_default_config() -> Dict[str, Any]:
         )
 
     qdrant_config: Dict[str, Any] = {
-        "host": os.environ.get("QDRANT_HOST", "mem0-store"),
-        "port": _env_int("QDRANT_PORT", 6333),
         "collection_name": os.environ.get("QDRANT_COLLECTION_NAME", "mem0"),
     }
-    qdrant_api_key = os.environ.get("QDRANT_API_KEY")
-    if qdrant_api_key:
+    if qdrant_url:
+        if not qdrant_api_key:
+            raise RuntimeError("QDRANT_URL requires QDRANT_API_KEY when using Mem0's Qdrant url-based config.")
+        qdrant_config["url"] = qdrant_url
         qdrant_config["api_key"] = qdrant_api_key
+    else:
+        qdrant_config["host"] = os.environ.get("QDRANT_HOST", "mem0-store")
+        qdrant_config["port"] = _env_int("QDRANT_PORT", 6333)
+        if qdrant_api_key:
+            logging.warning(
+                "Ignoring QDRANT_API_KEY because QDRANT_URL is not set. "
+                "For the internal mem0-store service, using an API key would force HTTPS and break local HTTP connectivity."
+            )
 
     config: Dict[str, Any] = {
         "version": "v1.1",

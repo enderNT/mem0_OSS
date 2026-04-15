@@ -28,6 +28,7 @@ The FastAPI service now serves a lightweight management UI at `/`.
 5. Expose only the `gateway` service with a domain on port `80`.
 
 If Coolify reports a failure while `mem0-store` is pulling, set `QDRANT_IMAGE` explicitly in the resource environment. The default is now `qdrant/qdrant:v1.17.1`.
+If `mem0-api` fails with an SSL error during startup, clear `QDRANT_API_KEY` unless you are intentionally using an external `QDRANT_URL`.
 
 ## Coolify
 

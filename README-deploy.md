@@ -48,6 +48,14 @@ At minimum set these in Coolify:
 
 Recommended defaults are already included in `.env.coolify.example`.
 
+For the default single-node stack in this repository:
+
+- Leave `QDRANT_API_KEY` empty.
+- Leave `QDRANT_URL` empty.
+- Keep `QDRANT_HOST=mem0-store` and `QDRANT_PORT=6333`.
+
+Only set `QDRANT_URL` plus `QDRANT_API_KEY` when you are connecting to an external or managed Qdrant instance instead of the bundled `mem0-store` container.
+
 Important for public Git repos:
 
 - Commit `.env.coolify.example`, not real `.env` or `.env.coolify` files.
@@ -152,3 +160,13 @@ If Coolify fails during `mem0-store Pulling`:
 3. In Coolify, set `QDRANT_IMAGE=qdrant/qdrant:v1.17.1` explicitly if an older cached environment value is still present.
 4. If your server uses a registry mirror or private proxy, set `QDRANT_IMAGE` to that fully qualified image reference instead.
 5. If it still fails, the issue is likely host-level registry access, rate limiting, or outbound networking rather than the compose syntax.
+
+## Troubleshooting SSL during Mem0 startup
+
+If `mem0-api` logs an error like `[SSL] record layer failure` during `Mem0 initialization failed`:
+
+1. Check whether `QDRANT_API_KEY` is set in Coolify.
+2. If you are using the bundled `mem0-store` service, clear `QDRANT_API_KEY` and leave `QDRANT_URL` empty.
+3. Redeploy.
+
+Reason: the Qdrant Python client switches to HTTPS automatically when an API key is supplied. The bundled `mem0-store` in this compose stack is plain HTTP on the internal Docker network, so forcing TLS causes the SSL handshake failure.

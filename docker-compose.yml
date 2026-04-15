@@ -60,6 +60,7 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY:?ADMIN_API_KEY is required}
       QDRANT_HOST: ${QDRANT_HOST:-mem0-store}
       QDRANT_PORT: ${QDRANT_PORT:-6333}
+      QDRANT_URL: ${QDRANT_URL:-}
       QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-mem0}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       HISTORY_DB_PATH: ${HISTORY_DB_PATH:-/app/history/history.db}
