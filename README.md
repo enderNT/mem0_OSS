@@ -17,6 +17,7 @@ This is a Mem0 OSS API deployment, not OpenMemory.
 The FastAPI service now serves a lightweight management UI at `/`.
 
 - `/` provides a browser-based console for create, read, update, delete, search, history, configure, and reset actions.
+- Listing supports both scoped retrieval and full-store retrieval: if `user_id`, `agent_id`, and `run_id` are all empty, the console and `GET /memories` return every stored memory.
 - `/docs` keeps the OpenAPI / Swagger interface available for direct API inspection.
 
 ## GitHub to Coolify flow

@@ -285,19 +285,16 @@ function queryStringFromObject(input) {
 
 async function loadMemories() {
   const scope = Object.fromEntries(Object.entries(buildGlobalScope()).filter(([, value]) => Boolean(value)));
-  if (!Object.keys(scope).length) {
-    setResult("Cargar memorias", { error: "Define user_id, agent_id o run_id" });
-    return;
-  }
+  const resultLabel = Object.keys(scope).length ? "Cargar memorias" : "Cargar todas las memorias";
 
   try {
     const payload = await apiRequest(`/memories${queryStringFromObject(scope)}`);
     state.memories = normalizeMemoryArray(payload);
     renderMemoryList(state.memories);
-    setResult("Cargar memorias", payload);
+    setResult(resultLabel, payload);
   } catch (error) {
     renderMemoryList([]);
-    setResult("Cargar memorias", { error: error.message });
+    setResult(resultLabel, { error: error.message });
   }
 }
 

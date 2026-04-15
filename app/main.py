@@ -259,6 +259,136 @@ def _apply_score_threshold(results: Any, threshold: Optional[float]) -> Any:
     return filtered_results
 
 
+def _unwrap_vector_store_results(raw_results: Any) -> List[Any]:
+    if raw_results is None:
+        return []
+
+    if isinstance(raw_results, (tuple, list)) and raw_results:
+        first_element = raw_results[0]
+        if isinstance(first_element, (list, tuple)):
+            return list(first_element)
+
+    if isinstance(raw_results, list):
+        return raw_results
+
+    return [raw_results]
+
+
+def _format_vector_store_results(raw_results: Any) -> List[Dict[str, Any]]:
+    promoted_payload_keys = ["user_id", "agent_id", "run_id", "actor_id", "role"]
+    core_and_promoted_keys = {
+        "data",
+        "memory",
+        "text",
+        "content",
+        "hash",
+        "created_at",
+        "updated_at",
+        "id",
+        "text_lemmatized",
+        "attributed_to",
+        *promoted_payload_keys,
+    }
+
+    formatted_results: List[Dict[str, Any]] = []
+    for item in _unwrap_vector_store_results(raw_results):
+        payload = getattr(item, "payload", None)
+        item_id = getattr(item, "id", None)
+
+        if isinstance(item, dict):
+            payload = item.get("payload", item)
+            item_id = item.get("id", item_id)
+
+        if not isinstance(payload, dict):
+            payload = {}
+
+        memory_item: Dict[str, Any] = {
+            "id": str(item_id) if item_id is not None else None,
+            "memory": payload.get("data") or payload.get("memory") or payload.get("text") or payload.get("content") or "",
+            "hash": payload.get("hash"),
+            "created_at": payload.get("created_at"),
+            "updated_at": payload.get("updated_at"),
+        }
+
+        for key in promoted_payload_keys:
+            if key in payload:
+                memory_item[key] = payload[key]
+
+        additional_metadata = {key: value for key, value in payload.items() if key not in core_and_promoted_keys}
+        if additional_metadata:
+            memory_item["metadata"] = additional_metadata
+
+        formatted_results.append(memory_item)
+
+    return formatted_results
+
+
+def _extract_collection_count(collection_info: Any) -> Optional[int]:
+    if collection_info is None:
+        return None
+
+    if hasattr(collection_info, "model_dump"):
+        dumped = collection_info.model_dump()
+        if dumped != collection_info:
+            return _extract_collection_count(dumped)
+
+    candidate_keys = ("points_count", "vectors_count", "count", "row_count")
+    if isinstance(collection_info, dict):
+        for key in candidate_keys:
+            value = collection_info.get(key)
+            if isinstance(value, int) and value >= 0:
+                return value
+        return None
+
+    for key in candidate_keys:
+        value = getattr(collection_info, key, None)
+        if isinstance(value, int) and value >= 0:
+            return value
+
+    return None
+
+
+def _determine_global_list_limit() -> tuple[int, bool]:
+    fallback_limit = _env_int("MEM0_GLOBAL_LIST_FALLBACK_LIMIT", 1000)
+    vector_store = getattr(MEMORY_INSTANCE, "vector_store", None)
+    if vector_store is None:
+        return fallback_limit, True
+
+    if hasattr(vector_store, "col_info"):
+        try:
+            collection_count = _extract_collection_count(vector_store.col_info())
+            if collection_count is not None:
+                return max(collection_count, 1), False
+        except Exception as exc:
+            logging.warning("Could not determine vector store size for global listing: %s", exc)
+
+    return fallback_limit, True
+
+
+def _list_all_memories() -> Dict[str, Any]:
+    vector_store = getattr(MEMORY_INSTANCE, "vector_store", None)
+    if vector_store is None:
+        raise RuntimeError("Mem0 vector store is not available.")
+
+    limit, used_fallback_limit = _determine_global_list_limit()
+
+    raw_results = vector_store.list(filters=None, top_k=limit)
+    formatted_results = _format_vector_store_results(raw_results)
+
+    response: Dict[str, Any] = {
+        "results": formatted_results,
+        "scope": "all",
+        "total": len(formatted_results),
+    }
+    if used_fallback_limit and len(formatted_results) >= limit:
+        response["warning"] = (
+            "The vector store size could not be determined exactly. "
+            f"Returned the first {limit} memories from the store."
+        )
+
+    return response
+
+
 @app.get("/", include_in_schema=False)
 def home() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
@@ -297,10 +427,10 @@ def get_all_memories(
     agent_id: Optional[str] = None,
     _api_key: Optional[str] = Depends(verify_api_key),
 ) -> JSONResponse:
-    if not any([user_id, run_id, agent_id]):
-        raise HTTPException(status_code=400, detail="At least one identifier is required.")
-
     try:
+        if not any([user_id, run_id, agent_id]):
+            return _json_response(_list_all_memories())
+
         params = {
             key: value
             for key, value in {"user_id": user_id, "run_id": run_id, "agent_id": agent_id}.items()
