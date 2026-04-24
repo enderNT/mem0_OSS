@@ -193,14 +193,47 @@ class SearchRequest(BaseModel):
     threshold: Optional[float] = Field(None, description="Minimum similarity score for results.")
 
 
+def _merge_entity_filters(
+    filters: Optional[Dict[str, Any]] = None,
+    *,
+    user_id: Optional[str] = None,
+    run_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    merged_filters = dict(filters or {})
+
+    for key, value in {"user_id": user_id, "run_id": run_id, "agent_id": agent_id}.items():
+        if value is not None:
+            merged_filters[key] = value
+
+    return merged_filters
+
+
+def _contains_scope_identifier(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            if key in {"user_id", "run_id", "agent_id"} and nested_value is not None:
+                return True
+            if _contains_scope_identifier(nested_value):
+                return True
+    elif isinstance(value, list):
+        return any(_contains_scope_identifier(item) for item in value)
+
+    return False
+
+
 def _prepare_search_kwargs(search_req: SearchRequest) -> tuple[Dict[str, Any], bool]:
     supported_params = inspect.signature(MEMORY_INSTANCE.search).parameters
     search_kwargs: Dict[str, Any] = {}
+    merged_filters = _merge_entity_filters(
+        search_req.filters,
+        user_id=search_req.user_id,
+        run_id=search_req.run_id,
+        agent_id=search_req.agent_id,
+    )
 
-    for field_name in ("user_id", "run_id", "agent_id", "filters"):
-        value = getattr(search_req, field_name)
-        if value is not None and field_name in supported_params:
-            search_kwargs[field_name] = value
+    if merged_filters and "filters" in supported_params:
+        search_kwargs["filters"] = merged_filters
 
     requested_limit = search_req.limit if search_req.limit is not None else search_req.top_k
     if requested_limit is not None:
@@ -458,11 +491,7 @@ def get_all_memories(
         if not any([user_id, run_id, agent_id]):
             return _json_response(_list_all_memories())
 
-        params = {
-            key: value
-            for key, value in {"user_id": user_id, "run_id": run_id, "agent_id": agent_id}.items()
-            if value is not None
-        }
+        params = {"filters": _merge_entity_filters(user_id=user_id, run_id=run_id, agent_id=agent_id)}
         return _json_response(MEMORY_INSTANCE.get_all(**params))
     except Exception as exc:
         logging.exception("Error in get_all_memories")
@@ -541,11 +570,26 @@ def delete_all_memories(
 @app.post("/search", summary="Search memories")
 def search_memories(search_req: SearchRequest, _api_key: Optional[str] = Depends(verify_api_key)) -> JSONResponse:
     try:
+        if not _contains_scope_identifier(
+            {
+                "user_id": search_req.user_id,
+                "run_id": search_req.run_id,
+                "agent_id": search_req.agent_id,
+                "filters": search_req.filters,
+            }
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Search requires at least one of user_id, agent_id, or run_id, either directly or inside filters.",
+            )
+
         search_kwargs, threshold_is_native = _prepare_search_kwargs(search_req)
         results = MEMORY_INSTANCE.search(query=search_req.query, **search_kwargs)
         if search_req.threshold is not None and not threshold_is_native:
             results = _apply_score_threshold(results, search_req.threshold)
         return _json_response(results)
+    except HTTPException:
+        raise
     except Exception as exc:
         logging.exception("Error in search_memories")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
